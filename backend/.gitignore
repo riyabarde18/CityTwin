@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+citytwin.db
+citytwin.db-*
+uploads/
+.pytest_cache/
+*.log
+venv/
+.venv/

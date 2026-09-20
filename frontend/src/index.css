@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-sky-50 text-navy-900 font-sans antialiased selection:bg-sky-200 selection:text-navy-900;
+  }
+}
+
+/* Smooth in-page scrolling between sections (nav anchors, "scroll down to explore") */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Section entrance: a soft fade/rise as each scroll-snapped section comes into view */
+@keyframes section-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.section-anchor {
+  scroll-margin-top: 5.5rem; /* keeps the sticky navbar from covering the section heading */
+}
+
+/* --- Hero weather animation (sun / cloud / rain / wind, time-of-day driven) --- */
+@keyframes sun-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.95; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+@keyframes sun-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes cloud-drift {
+  from { transform: translateX(-8%); }
+  to { transform: translateX(8%); }
+}
+@keyframes cloud-drift-slow {
+  from { transform: translateX(6%); }
+  to { transform: translateX(-6%); }
+}
+@keyframes raindrop-fall {
+  0% { transform: translateY(-10px); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(40px); opacity: 0; }
+}
+@keyframes wind-line {
+  0% { transform: translateX(-30px); opacity: 0; }
+  30% { opacity: 0.8; }
+  100% { transform: translateX(30px); opacity: 0; }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.weather-sun { animation: sun-pulse 4s ease-in-out infinite; }
+.weather-sun-rays { animation: sun-spin 40s linear infinite; transform-origin: center; }
+.weather-cloud-1 { animation: cloud-drift 14s ease-in-out infinite alternate; }
+.weather-cloud-2 { animation: cloud-drift-slow 18s ease-in-out infinite alternate; }
+.weather-raindrop { animation: raindrop-fall 1.1s linear infinite; }
+.weather-wind-line { animation: wind-line 2.4s ease-in-out infinite; }
+.weather-star { animation: twinkle 3s ease-in-out infinite; }
+
+/* Leaflet Custom Pin & Pulse Styles */
+.leaflet-container {
+  font-family: inherit !important;
+  z-index: 1;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+.pulsing-hotspot {
+  animation: pulse-ring 2.5s infinite ease-in-out;
+  border-radius: 50%;
+  pointer-events: auto !important;
+}
+
+/* Custom Scrollbar for Right Panel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
