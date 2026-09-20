@@ -30,6 +30,10 @@ class EventModel(Base):
     # in a cluster is real cross-source corroboration, not just more of the
     # same kind of evidence — see pipeline.compute_pattern_score.
     evidence_source_type = Column(String, nullable=False, default="citizen_report", index=True)
+    # Links this (possibly AI-split-into-several-categories) event back to
+    # the single citizen submission it came from — see ReportModel. Null for
+    # synthetic seed data and camera feed events, neither of which earn points.
+    report_id = Column(String, nullable=True, index=True)
 
     # --- Automatic routing: every individual report is sent to a government
     # section (department) for its area (zone) the moment it's created, not
@@ -195,3 +199,61 @@ class EscalationModel(Base):
     acknowledged = Column(Boolean, nullable=False, default=False)
     acknowledged_at = Column(DateTime, nullable=True)
     acknowledged_by = Column(String, nullable=True)
+
+
+# --- Earn Points / Community Rewards ---
+
+class ReportModel(Base):
+    """
+    One citizen submission (a single call to POST /api/observations), which
+    may produce several EventModel rows (AI perception can split one photo
+    into multiple problem categories). Points are evaluated per *report*,
+    not per resulting event, so a five-category photo doesn't earn 5x.
+    """
+    __tablename__ = "reports"
+
+    report_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, nullable=True, index=True)  # null = anonymous submission, earns no points
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    has_photo = Column(Boolean, nullable=False, default=False)
+    has_meaningful_text = Column(Boolean, nullable=False, default=False)
+    has_accurate_location = Column(Boolean, nullable=False, default=False)
+    is_flagged_spam = Column(Boolean, nullable=False, default=False, index=True)
+    spam_reason = Column(String, nullable=True)
+    verified_by_user_id = Column(String, nullable=True)
+    verified_at = Column(DateTime, nullable=True)
+    authority_confirmed = Column(Boolean, nullable=False, default=False)
+    authority_confirmed_at = Column(DateTime, nullable=True)
+    followup_submitted_at = Column(DateTime, nullable=True)
+    followup_text = Column(Text, nullable=True)
+    followup_awarded = Column(Boolean, nullable=False, default=False)
+
+
+class PointsLedgerModel(Base):
+    """
+    Append-only record of every point award. The (user_id, report_id,
+    action_type) combination is the actual "only once" guarantee — every
+    award path checks for an existing row with that key before inserting,
+    rather than trusting a mutable counter.
+    """
+    __tablename__ = "points_ledger"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, nullable=False, index=True)
+    report_id = Column(String, nullable=True, index=True)
+    action_type = Column(String, nullable=False, index=True)
+    points = Column(Integer, nullable=False)
+    note = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class RedemptionModel(Base):
+    """A reward a user has redeemed, spending points from their balance."""
+    __tablename__ = "redemptions"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, nullable=False, index=True)
+    reward_id = Column(String, nullable=False)
+    reward_name = Column(String, nullable=False)
+    points_spent = Column(Integer, nullable=False)
+    redeemed_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

@@ -12,7 +12,13 @@ import {
   User,
   AuthResponse,
   RequestOtpResponse,
-  Escalation
+  Escalation,
+  ObservationSubmitResult,
+  PointsSummary,
+  Reward,
+  Redemption,
+  VerifiableReport,
+  CommunityPartner
 } from './types';
 
 // Empty string = same-origin relative requests. This works in three setups:
@@ -76,8 +82,8 @@ export const getEvents = async (period?: 'before' | 'after'): Promise<EventItem[
   return res.data;
 };
 
-export const postObservation = async (formData: FormData): Promise<EventItem[]> => {
-  const res = await api.post<EventItem[]>('/api/observations', formData, {
+export const postObservation = async (formData: FormData): Promise<ObservationSubmitResult> => {
+  const res = await api.post<ObservationSubmitResult>('/api/observations', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -239,6 +245,48 @@ export const getEscalations = async (filters?: EscalationFilters): Promise<Escal
 
 export const acknowledgeEscalation = async (id: string, actorLabel?: string): Promise<Escalation> => {
   const res = await api.patch<Escalation>(`/api/escalations/${id}/acknowledge`, { actor_label: actorLabel });
+  return res.data;
+};
+
+// --- Earn Points / Community Rewards ---
+
+export const getPointsSummary = async (): Promise<PointsSummary> => {
+  const res = await api.get<PointsSummary>('/api/points/summary');
+  return res.data;
+};
+
+export const getRewards = async (): Promise<Reward[]> => {
+  const res = await api.get<Reward[]>('/api/rewards');
+  return res.data;
+};
+
+export const redeemReward = async (rewardId: string): Promise<Redemption> => {
+  const res = await api.post<Redemption>('/api/rewards/redeem', { reward_id: rewardId });
+  return res.data;
+};
+
+export const getMyRedemptions = async (): Promise<Redemption[]> => {
+  const res = await api.get<Redemption[]>('/api/rewards/redeemed');
+  return res.data;
+};
+
+export const getVerifiableReports = async (): Promise<VerifiableReport[]> => {
+  const res = await api.get<VerifiableReport[]>('/api/reports/verifiable');
+  return res.data;
+};
+
+export const verifyReport = async (reportId: string): Promise<PointsSummary> => {
+  const res = await api.post<PointsSummary>(`/api/reports/${reportId}/verify`);
+  return res.data;
+};
+
+export const submitFollowup = async (reportId: string, text: string): Promise<PointsSummary> => {
+  const res = await api.post<PointsSummary>(`/api/reports/${reportId}/followup`, { text });
+  return res.data;
+};
+
+export const getCommunityPartners = async (): Promise<CommunityPartner[]> => {
+  const res = await api.get<CommunityPartner[]>('/api/community-partners');
   return res.data;
 };
 

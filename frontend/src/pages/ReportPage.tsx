@@ -5,7 +5,7 @@ import { postObservation } from '../api';
 import { EventItem } from '../types';
 import { getCategoryMeta } from '../utils/categoryConfig';
 import { useAuth } from '../context/AuthContext';
-import { Camera, MapPin, Send, Navigation, CheckCircle2, AlertCircle, Building2, ShieldCheck } from 'lucide-react';
+import { Camera, MapPin, Send, Navigation, CheckCircle2, AlertCircle, Building2, ShieldCheck, Trophy } from 'lucide-react';
 
 // Location Pin Selector helper
 const LocationMarker: React.FC<{
@@ -30,6 +30,8 @@ export const ReportPage: React.FC = () => {
   const [position, setPosition] = useState<[number, number]>([37.7749, -122.4194]);
   const [loading, setLoading] = useState(false);
   const [resultEvents, setResultEvents] = useState<EventItem[] | null>(null);
+  const [pointsAwarded, setPointsAwarded] = useState<number | null>(null);
+  const [spamNotice, setSpamNotice] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,6 +60,8 @@ export const ReportPage: React.FC = () => {
     setLoading(true);
     setErrorMsg(null);
     setResultEvents(null);
+    setPointsAwarded(null);
+    setSpamNotice(null);
 
     try {
       const formData = new FormData();
@@ -77,8 +81,14 @@ export const ReportPage: React.FC = () => {
       }
       formData.append('timestamp', new Date().toISOString());
 
-      const events = await postObservation(formData);
-      setResultEvents(events);
+      const result = await postObservation(formData);
+      setResultEvents(result.events);
+      if (user) {
+        setPointsAwarded(result.points_awarded);
+      }
+      if (result.is_spam) {
+        setSpamNotice(result.spam_reason || 'This report was flagged and did not earn points.');
+      }
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to submit observation report.');
     } finally {
@@ -219,6 +229,32 @@ export const ReportPage: React.FC = () => {
         <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center space-x-2 text-xs text-rose-700">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Spam / anti-abuse notice */}
+      {spamNotice && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center space-x-2 text-xs text-amber-800">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>{spamNotice}</span>
+        </div>
+      )}
+
+      {/* Points earned banner */}
+      {pointsAwarded !== null && pointsAwarded > 0 && (
+        <div className="bg-gradient-to-r from-amber-400 to-amber-500 text-white p-4 rounded-2xl shadow-md flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-white/20 rounded-full">
+              <Trophy className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold">+{pointsAwarded} points earned!</p>
+              <p className="text-[11px] text-amber-50/90">See your total in the Earn Points section below.</p>
+            </div>
+          </div>
+          <a href="#rewards" className="text-[11px] font-bold underline underline-offset-2 whitespace-nowrap">
+            View progress
+          </a>
         </div>
       )}
 

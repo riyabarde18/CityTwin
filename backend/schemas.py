@@ -23,6 +23,7 @@ class EventSchema(BaseModel):
     is_synthetic: bool
     period: str
     evidence_source_type: str = "citizen_report"
+    report_id: Optional[str] = None
 
     # --- Automatic routing: set the instant the report is created ---
     assigned_department: str = "Municipal Operations (General)"
@@ -36,6 +37,12 @@ class EventSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ObservationSubmitResponse(BaseModel):
+    events: List[EventSchema]
+    points_awarded: int = 0
+    is_spam: bool = False
+    spam_reason: Optional[str] = None
 
 class CenterCoordinates(BaseModel):
     lat: float
@@ -245,3 +252,54 @@ class EscalationSchema(BaseModel):
 
 class AcknowledgeEscalationRequest(BaseModel):
     actor_label: Optional[str] = Field(None, description="Name/role of the person acknowledging, e.g. 'PWD Ward 7 Officer'")
+
+# --- Earn Points / Community Rewards ---
+
+class PointsSummarySchema(BaseModel):
+    total_points_earned: int
+    points_redeemed: int
+    points_remaining: int
+    verified_reports: int
+    issues_contributed: int
+    level: str
+    next_level: Optional[str] = None
+    next_level_points: Optional[int] = None
+    points_to_next: int = 0
+    progress_pct: float = 0.0
+
+class RewardSchema(BaseModel):
+    id: str
+    name: str
+    points_required: int
+    description: str
+    partner: str
+
+class RedemptionSchema(BaseModel):
+    id: str
+    reward_id: str
+    reward_name: str
+    points_spent: int
+    redeemed_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class RedeemRewardRequest(BaseModel):
+    reward_id: str
+
+class VerifiableReportSchema(BaseModel):
+    report_id: str
+    created_at: datetime
+    category: str
+    description: str
+    image_path: Optional[str] = None
+    lat: float
+    lon: float
+
+class FollowupRequest(BaseModel):
+    text: str = Field(..., description="A meaningful update on the issue's current state")
+
+class CommunityPartnerSchema(BaseModel):
+    name: str
+    category: str
+    offer: str

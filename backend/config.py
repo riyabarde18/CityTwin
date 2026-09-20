@@ -196,3 +196,117 @@ EVIDENCE_SOURCE_RELEVANT_CATEGORIES = {
 # (see pipeline.compute_pattern_score) — additive on top of the existing
 # 0-100 score, which stays clamped to 100 overall.
 CROSS_SOURCE_BONUS_MAX_PTS = 15.0
+
+# --- Earn Points / Community Rewards ---
+# Every award is logged once to an append-only ledger (see points.py) keyed
+# by (user, report, action_type); a row already existing for that key is
+# what makes every rule below "only once", not application-level trust.
+POINTS_REPORT_ISSUE = 10
+POINTS_PHOTO_EVIDENCE = 5
+POINTS_TEXT_DESCRIPTION = 5
+POINTS_ACCURATE_LOCATION = 5
+POINTS_VERIFIED_BY_USER = 10
+POINTS_AUTHORITY_CONFIRMED = 25
+POINTS_USEFUL_FOLLOWUP = 10
+
+# A description shorter than this reads as noise ("ok", "issue here"), not a
+# meaningful account of the problem.
+MIN_MEANINGFUL_TEXT_CHARS = 15
+
+# A submitted point within this many degrees of the city's default center is
+# almost always an un-moved map pin (geolocation failed, user didn't bother
+# placing it) rather than a real, accurate location. ~0.0001 deg ~= 11m.
+ACCURATE_LOCATION_MIN_OFFSET_DEG = 0.0001
+
+# Anti-spam: a report is auto-flagged (no points, no report attributed to
+# gaming the system) if its photo hash exactly matches one already on file,
+# or if the same user has filed more than this many reports in the window.
+SPAM_RATE_LIMIT_WINDOW_MINUTES = 60
+SPAM_RATE_LIMIT_MAX_REPORTS = 5
+
+# A follow-up only counts as "useful" — and only earns points — once this
+# many days have passed since the original report, so it can't be farmed
+# immediately after submission.
+FOLLOWUP_MIN_DAYS_AFTER_REPORT = 7
+
+# Lifetime points thresholds for contribution levels. Deliberately based on
+# *total earned*, not current balance, so redeeming a reward can never
+# demote you.
+CONTRIBUTION_LEVELS = [
+    {"level": "Newcomer", "min_points": 0},
+    {"level": "Bronze Citizen", "min_points": 100},
+    {"level": "Silver Citizen", "min_points": 200},
+    {"level": "Gold Citizen", "min_points": 300},
+    {"level": "City Champion", "min_points": 400},
+]
+
+# Static reward catalog. A real deployment would move this to a DB table
+# once partners are onboarded; static is honest and sufficient for a demo
+# with illustrative/example partners.
+REWARD_CATALOG = [
+    {
+        "id": "partner-discount-voucher",
+        "name": "Partner Discount Voucher",
+        "points_required": 100,
+        "description": "A discount voucher redeemable at a participating local business.",
+        "partner": "Community Partner Network",
+    },
+    {
+        "id": "citytwin-keychain",
+        "name": "CityTwin Keychain",
+        "points_required": 200,
+        "description": "A physical CityTwin keychain — thanks for helping map the city.",
+        "partner": "CityTwin",
+    },
+    {
+        "id": "partner-cafe-discount",
+        "name": "Partner Café Discount",
+        "points_required": 200,
+        "description": "A discount at a partner café near you.",
+        "partner": "Local Café Partner",
+    },
+    {
+        "id": "library-store-discount",
+        "name": "Library / Store Discount",
+        "points_required": 200,
+        "description": "A discount at a partner library or bookstore.",
+        "partner": "Local Library / Store Partner",
+    },
+    {
+        "id": "citytwin-pen",
+        "name": "CityTwin Pen / Stationery Set",
+        "points_required": 300,
+        "description": "A CityTwin-branded pen and stationery set.",
+        "partner": "CityTwin",
+    },
+    {
+        "id": "larger-partner-discount",
+        "name": "Larger Partner Discount",
+        "points_required": 300,
+        "description": "A bigger discount at a participating local business.",
+        "partner": "Community Partner Network",
+    },
+    {
+        "id": "citytwin-tshirt",
+        "name": "CityTwin T-Shirt",
+        "points_required": 400,
+        "description": "An official CityTwin T-shirt for top contributors.",
+        "partner": "CityTwin",
+    },
+    {
+        "id": "premium-partner-voucher",
+        "name": "Premium Partner Voucher",
+        "points_required": 400,
+        "description": "A premium voucher at a top-tier community partner.",
+        "partner": "Community Partner Network",
+    },
+]
+
+# Illustrative example partners for the "Community Partners" section — a
+# real deployment would replace these with actual onboarded businesses.
+COMMUNITY_PARTNERS = [
+    {"name": "Corner Café", "category": "Café", "offer": "10% off with a Partner Café Discount voucher"},
+    {"name": "City Reads Bookstore", "category": "Library / Bookstore", "offer": "Discount on books and stationery"},
+    {"name": "Neighborhood Stationery Co.", "category": "Stationery", "offer": "Discount with a redeemed voucher"},
+    {"name": "Local Goods Market", "category": "General Store", "offer": "Partner discount on select items"},
+]

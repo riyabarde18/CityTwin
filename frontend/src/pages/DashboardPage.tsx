@@ -22,11 +22,12 @@ import {
 import { CATEGORY_MAP } from '../utils/categoryConfig';
 import { ReportPage } from './ReportPage';
 import { MyReportsPage } from './MyReportsPage';
+import { RewardsPage } from './RewardsPage';
 import { DepartmentInboxPage } from './DepartmentInboxPage';
 import { TransparencyBar } from '../components/TransparencyBar';
 import { LoginModal } from '../components/LoginModal';
 import {
-  AlertCircle, MapPinned, Radar, Building2, PlusCircle, UserCheck, Inbox, ChevronDown
+  AlertCircle, MapPinned, Radar, Building2, PlusCircle, UserCheck, Inbox, ChevronDown, Trophy
 } from 'lucide-react';
 
 /** A section heading used consistently as you scroll from one part of the platform to the next. */
@@ -327,6 +328,17 @@ export const DashboardPage: React.FC = () => {
             description="Track what happened to what you reported — department, status, and progress toward resolution."
           />
           <MyReportsPage />
+        </section>
+
+        {/* ============ SECTION: EARN POINTS / REWARDS ============ */}
+        <section id="rewards" className="section-anchor py-12 px-4 sm:px-6 lg:px-8 bg-white">
+          <SectionHeading
+            icon={Trophy}
+            eyebrow="For citizens"
+            title="Earn Points & Rewards"
+            description="Real, useful contributions earn points toward levels and rewards from community partners — spam and duplicates never do."
+          />
+          <RewardsPage />
         </section>
 
         {/* ============ SECTION: DEPARTMENT INBOX ============ */}

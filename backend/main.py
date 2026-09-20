@@ -10,18 +10,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from config import IS_MOCK_MODE, UPLOADS_DIR, DISCLAIMER, PATTERN_STATUSES
+from config import IS_MOCK_MODE, UPLOADS_DIR, DISCLAIMER, PATTERN_STATUSES, REWARD_CATALOG, COMMUNITY_PARTNERS
 from database import Base, engine, get_db
 from models import (
     EventModel, PatternModel, PatternStatusEventModel, EventStatusEventModel,
-    UserModel, EscalationModel
+    UserModel, EscalationModel, ReportModel, PointsLedgerModel
 )
 from schemas import (
     HealthResponse, EventSchema, PatternSummarySchema, PatternDetailSchema,
     InterventionsSimulateRequest, InterventionsSimulateResponse, CenterCoordinates,
     StatusUpdateRequest, StatusLogEntrySchema, MyReportItemSchema, TransparencySummarySchema,
     UserSchema, RequestOtpSchema, RequestOtpResponse, VerifyOtpSchema, AuthResponse,
-    EscalationSchema, AcknowledgeEscalationRequest
+    EscalationSchema, AcknowledgeEscalationRequest, PointsSummarySchema, RewardSchema,
+    RedemptionSchema, RedeemRewardRequest, VerifiableReportSchema, FollowupRequest,
+    CommunityPartnerSchema, ObservationSubmitResponse
 )
 from perception import run_perception, compute_image_hash
 from pipeline import run_full_pipeline
@@ -30,6 +32,7 @@ from simulator import simulate_intervention
 import governance
 import auth as auth_module
 import risk_escalation
+import points as points_module
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine, checkfirst=True)
@@ -65,6 +68,15 @@ def get_optional_user(
     if not token:
         return None
     return auth_module.get_user_from_token(db, token)
+
+
+def get_required_user(
+    user: Optional[UserModel] = Depends(get_optional_user)
+) -> UserModel:
+    """FastAPI dependency: 401s if not logged in — for endpoints that need a persistent identity (points, rewards)."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to use this feature.")
+    return user
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -110,7 +122,7 @@ def get_me(user: Optional[UserModel] = Depends(get_optional_user)):
     return user
 
 
-@app.post("/api/observations", response_model=List[EventSchema])
+@app.post("/api/observations", response_model=ObservationSubmitResponse)
 async def create_observation(
     image: Optional[UploadFile] = File(None),
     text: Optional[str] = Form(None),
@@ -166,6 +178,16 @@ async def create_observation(
     # Run perception step
     perception_events = run_perception(text=text, image_bytes=image_bytes)
 
+    # Earn Points: one Report ties this whole submission together, however
+    # many category-events perception splits it into — points are evaluated
+    # per report, not per resulting event. Anonymous submissions (no logged
+    # in user) still create a report for record-keeping but earn nothing.
+    report = points_module.create_report(
+        db, user_id=current_user.user_id if current_user else None,
+        lat=lat, lon=lon, text=text,
+        has_photo=bool(image_bytes), image_hash=image_hash_val,
+    )
+
     created_events = []
     evidence_type = "photo" if image else "text"
     routed_at = datetime.utcnow()  # SLA clock starts when the report reaches the system
@@ -187,7 +209,8 @@ async def create_observation(
             image_hash=image_hash_val,
             confidence=p_event.confidence,
             is_synthetic=False,
-            period="before"
+            period="before",
+            report_id=report.report_id,
         )
 
         # Auto-route immediately: no waiting for pattern detection. Every
@@ -212,7 +235,24 @@ async def create_observation(
     for e in created_events:
         db.refresh(e)
 
-    return created_events
+    # What THIS submission earned (not the lifetime total) — sum the ledger
+    # rows just created for this report_id.
+    points_awarded = 0
+    if current_user:
+        rows = (
+            db.query(PointsLedgerModel)
+            .filter(PointsLedgerModel.report_id == report.report_id)
+            .with_entities(PointsLedgerModel.points)
+            .all()
+        )
+        points_awarded = sum(p[0] for p in rows)
+
+    return ObservationSubmitResponse(
+        events=created_events,
+        points_awarded=points_awarded,
+        is_spam=report.is_flagged_spam,
+        spam_reason=report.spam_reason,
+    )
 
 
 @app.post("/api/camera-feeds/ingest", response_model=List[EventSchema])
@@ -706,6 +746,10 @@ def update_event_status(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    # Earn Points: the first time an officer acknowledges/resolves this
+    # report's event, credit the reporter's "confirmed by authority" points.
+    points_module.maybe_confirm_authority_for_event(db, event)
+
     db.commit()
     db.refresh(event)
     return event
@@ -777,6 +821,99 @@ def simulate_intervention_endpoint(
         return res
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# --- Earn Points / Community Rewards ---
+
+@app.get("/api/points/summary", response_model=PointsSummarySchema)
+def get_my_points_summary(
+    user: UserModel = Depends(get_required_user),
+    db: Session = Depends(get_db)
+):
+    """Totals, level, and progress toward the next level for the logged-in user."""
+    return points_module.get_points_summary(db, user.user_id)
+
+
+@app.get("/api/rewards", response_model=List[RewardSchema])
+def list_rewards():
+    """The static reward catalog — no auth needed, anyone can browse what's redeemable."""
+    return REWARD_CATALOG
+
+
+@app.post("/api/rewards/redeem", response_model=RedemptionSchema)
+def redeem_reward_endpoint(
+    req: RedeemRewardRequest,
+    user: UserModel = Depends(get_required_user),
+    db: Session = Depends(get_db)
+):
+    """Spends points from the user's balance on a reward. Fails if the balance is insufficient."""
+    try:
+        redemption = points_module.redeem_reward(db, user.user_id, req.reward_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    db.commit()
+    db.refresh(redemption)
+    return redemption
+
+
+@app.get("/api/rewards/redeemed", response_model=List[RedemptionSchema])
+def get_my_redemptions(
+    user: UserModel = Depends(get_required_user),
+    db: Session = Depends(get_db)
+):
+    """The logged-in user's redemption history."""
+    return points_module.list_redemptions(db, user.user_id)
+
+
+@app.get("/api/reports/verifiable", response_model=List[VerifiableReportSchema])
+def get_verifiable_reports_endpoint(
+    user: Optional[UserModel] = Depends(get_optional_user),
+    db: Session = Depends(get_db)
+):
+    """Other citizens' recent reports available for community verification (excludes your own)."""
+    return points_module.get_verifiable_reports(db, exclude_user_id=user.user_id if user else None)
+
+
+@app.post("/api/reports/{report_id}/verify", response_model=PointsSummarySchema)
+def verify_report_endpoint(
+    report_id: str,
+    user: UserModel = Depends(get_required_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Confirms someone else's report is real ("I can confirm this too"),
+    crediting its original reporter +10 points once. Returns the *verifier's*
+    own points summary (verifying doesn't earn the verifier anything — it
+    credits the reporter — but it's a convenient refresh point for the UI).
+    """
+    try:
+        points_module.verify_report(db, report_id, user.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    db.commit()
+    return points_module.get_points_summary(db, user.user_id)
+
+
+@app.post("/api/reports/{report_id}/followup", response_model=PointsSummarySchema)
+def submit_followup_endpoint(
+    report_id: str,
+    req: FollowupRequest,
+    user: UserModel = Depends(get_required_user),
+    db: Session = Depends(get_db)
+):
+    """Owner adds a follow-up update; earns +10 once, only if the report is >=7 days old and the text is meaningful."""
+    try:
+        points_module.submit_followup(db, report_id, user.user_id, req.text)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    db.commit()
+    return points_module.get_points_summary(db, user.user_id)
+
+
+@app.get("/api/community-partners", response_model=List[CommunityPartnerSchema])
+def get_community_partners():
+    """Illustrative example partners for the 'Community Partners' section."""
+    return COMMUNITY_PARTNERS
 
 
 # --- Serve the built frontend (single-origin deployment) ---

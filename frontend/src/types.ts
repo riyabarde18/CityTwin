@@ -26,6 +26,7 @@ export interface EventItem {
   confidence: number;
   is_synthetic: boolean;
   period: 'before' | 'after';
+  report_id?: string | null;
   // Auto-routing: set the instant the report is created, independent of
   // whether it ever becomes part of a detected pattern.
   assigned_department: string;
@@ -263,4 +264,60 @@ export interface Escalation {
   acknowledged: boolean;
   acknowledged_at?: string | null;
   acknowledged_by?: string | null;
+}
+
+// --- Earn Points / Community Rewards ---
+
+export interface ObservationSubmitResult {
+  events: EventItem[];
+  points_awarded: number;
+  is_spam: boolean;
+  spam_reason?: string | null;
+}
+
+export type ContributionLevel = 'Newcomer' | 'Bronze Citizen' | 'Silver Citizen' | 'Gold Citizen' | 'City Champion';
+
+export interface PointsSummary {
+  total_points_earned: number;
+  points_redeemed: number;
+  points_remaining: number;
+  verified_reports: number;
+  issues_contributed: number;
+  level: ContributionLevel;
+  next_level?: ContributionLevel | null;
+  next_level_points?: number | null;
+  points_to_next: number;
+  progress_pct: number;
+}
+
+export interface Reward {
+  id: string;
+  name: string;
+  points_required: number;
+  description: string;
+  partner: string;
+}
+
+export interface Redemption {
+  id: string;
+  reward_id: string;
+  reward_name: string;
+  points_spent: number;
+  redeemed_at: string;
+}
+
+export interface VerifiableReport {
+  report_id: string;
+  created_at: string;
+  category: UrbanCategory;
+  description: string;
+  image_path?: string | null;
+  lat: number;
+  lon: number;
+}
+
+export interface CommunityPartner {
+  name: string;
+  category: string;
+  offer: string;
 }

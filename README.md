@@ -65,6 +65,18 @@ Open **http://localhost:5173**. After changing frontend code for a demo, re-run
 - **Predictive risk escalation**: a background check flags problems that have sat open
   past their SLA *and* sit in a zone with severe rain forecast, and notifies the
   responsible department's inbox — see "Predictive Risk Escalation" below.
+- **Multi-source root-cause evidence**: NOAA weather (real) and CCTV vision (real, same
+  Gemini pipeline as citizen photos) plus satellite/mobility/transit (simulated, clearly
+  labeled) feed a "cross-source corroboration" score bonus and evidence-aware AI
+  explanations — see `evidence_sources.py`.
+- **Cascade risk prediction**: detected patterns are matched against a library of known
+  escalation scenarios (e.g. blocked drain → flood → disease outbreak) and rendered as a
+  staged severity climb from small observations to what could happen if ignored — see
+  `frontend/src/data/cascadeTemplates.ts`.
+- **Earn Points / Community Rewards**: citizens earn points for real, verified
+  contributions (reporting, evidence, verification, official confirmation, follow-ups),
+  track progress toward four contribution levels, and redeem points for rewards from
+  community partners — see "Earn Points / Community Rewards" below.
 
 ## Phone Accounts
 
@@ -94,6 +106,24 @@ actually raining wherever `CITY_CENTER` points, so set `DEMO_FORCE_WEATHER_RISK=
 to force every zone to read as a severe risk for presentation purposes — every
 escalation created this way is clearly labeled `"source": "simulated"` in its
 `weather_summary`, never silently swapped in for real data.
+
+## Earn Points / Community Rewards
+
+Real contributions earn points — reporting (+10), photo/video evidence (+5), a
+meaningful text description (+5), an accurate location (+5), another citizen
+verifying the report (+10), an authority acknowledging/resolving it (+25), and a
+useful follow-up ≥7 days later (+10). Every rule is "only once": each award is a row
+in an append-only ledger keyed by `(user, report, action)`, so re-triggering the same
+action is a no-op rather than a race to trust. Spam/duplicate reports (matching photo
+hash, or rate-limited rapid-fire submissions) are flagged and earn nothing.
+
+Four lifetime levels (100/200/300/400 pts: Bronze → Silver → Gold → City Champion)
+are based on total points *earned*, never current balance, so redeeming a reward can
+never demote you. See "Earn Points / Community Rewards" in `backend/README.md` for
+the full mechanics, and the **Earn Points** section on the site for the UI: points
+summary, level progress bar, a community-verification panel (confirm someone else's
+report to earn *them* points), the reward catalog, redemption history, and the
+Community Partners section.
 
 ## Known MVP limits (worth saying out loud to judges)
 

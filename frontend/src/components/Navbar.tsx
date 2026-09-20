@@ -15,6 +15,7 @@ const NAV_LINKS: NavLink[] = [
   { href: '#government', label: 'Government Dashboard' },
   { href: '#report', label: 'Report an Issue' },
   { href: '#my-reports', label: 'My Reports' },
+  { href: '#rewards', label: 'Earn Points' },
   { href: '#inbox', label: 'Department Inbox' },
 ];
 

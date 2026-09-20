@@ -1,11 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { getMyReports } from '../api';
+import { getMyReports, submitFollowup } from '../api';
 import { MyReportItem } from '../types';
 import { getCategoryMeta } from '../utils/categoryConfig';
 import { StatusBadge } from '../components/StatusBadge';
 import { ProgressBar } from '../components/ProgressBar';
 import { useAuth } from '../context/AuthContext';
-import { Search, Inbox, Link2, MapPin, Building2, History, ShieldCheck } from 'lucide-react';
+import { Search, Inbox, Link2, MapPin, Building2, History, ShieldCheck, MessageSquarePlus, Trophy } from 'lucide-react';
+
+const FOLLOWUP_MIN_DAYS = 7;
+
+/** Owner-only prompt to add a follow-up update once a report is old enough to earn the bonus. */
+const FollowupBox: React.FC<{ reportId: string; daysOld: number }> = ({ reportId, daysOld }) => {
+  const [text, setText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (daysOld < FOLLOWUP_MIN_DAYS) return null;
+  if (done) {
+    return (
+      <p className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center space-x-1.5">
+        <Trophy className="w-3.5 h-3.5" />
+        <span>Follow-up submitted — thanks for keeping this updated!</span>
+      </p>
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await submitFollowup(reportId, text.trim());
+      setDone(true);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to submit follow-up.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="pt-2 border-t border-slate-100 space-y-1.5">
+      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide flex items-center space-x-1">
+        <MessageSquarePlus className="w-3 h-3 text-sky-500" />
+        <span>This report is {daysOld}d old — add a follow-up (+10 pts)</span>
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Is the issue still there? Better, worse, or resolved?"
+        rows={2}
+        className="w-full px-2.5 py-1.5 text-[11px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none resize-none"
+      />
+      {error && <p className="text-[10px] text-rose-600 font-medium">{error}</p>}
+      <button
+        type="submit"
+        disabled={submitting || text.trim().length < 15}
+        className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50 transition"
+      >
+        {submitting ? <span className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <MessageSquarePlus className="w-2.5 h-2.5" />}
+        <span>Submit follow-up</span>
+      </button>
+    </form>
+  );
+};
 
 /**
  * Closes the citizen-awareness loop. Logged-in users see their reports
@@ -158,6 +217,14 @@ export const MyReportsPage: React.FC = () => {
                     </details>
                   )}
                 </div>
+
+                {/* Follow-up bonus — only meaningful for a real report_id (not synthetic demo data) owned by the current user */}
+                {user && r.event.report_id && (
+                  <FollowupBox
+                    reportId={r.event.report_id}
+                    daysOld={Math.floor((Date.now() - new Date(r.event.timestamp).getTime()) / 86400000)}
+                  />
+                )}
 
                 {r.pattern_id && (
                   <div className="mt-2 pt-2 border-t border-slate-100 space-y-1.5">

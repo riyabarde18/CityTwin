@@ -91,7 +91,7 @@ The pattern score is an explainable weighted sum of five key signal components m
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/api/health` | Health check & MOCK status mode indicator |
-| `POST` | `/api/observations` | Ingest observation (multipart form: image, text, lat, lon, submitter_id) |
+| `POST` | `/api/observations` | Ingest observation (multipart form: image, text, lat, lon, submitter_id); returns `{events, points_awarded, is_spam, spam_reason}` |
 | `GET` | `/api/events?period=before\|after` | Retrieve all stored events |
 | `POST` | `/api/seed` | Reset DB and load synthetic demo dataset |
 | `POST` | `/api/analyze` | Run 7-step analysis pipeline and generate patterns |
@@ -110,6 +110,26 @@ The pattern score is an explainable weighted sum of five key signal components m
 | `POST` | `/api/escalations/scan` | Runs the predictive risk scan now; returns newly created escalations |
 | `GET` | `/api/escalations?department=&zone=&acknowledged=` | Lists risk escalations (the "notification" surface) |
 | `PATCH` | `/api/escalations/{id}/acknowledge` | Department confirms it has seen and is acting on an escalation |
+| `GET` | `/api/points/summary` | Logged-in user's points totals, level, and progress to next level |
+| `GET` | `/api/rewards` | The static reward catalog (public) |
+| `POST` | `/api/rewards/redeem` | Spend points on a reward (`{reward_id}`) |
+| `GET` | `/api/rewards/redeemed` | Logged-in user's redemption history |
+| `GET` | `/api/reports/verifiable` | Other citizens' reports available for community verification |
+| `POST` | `/api/reports/{id}/verify` | Confirm someone else's report is real; credits its reporter +10 once |
+| `POST` | `/api/reports/{id}/followup` | Owner adds a follow-up update; +10 once, only if the report is ≥7 days old |
+| `GET` | `/api/community-partners` | Illustrative example partners for the rewards program |
+
+---
+
+## Earn Points / Community Rewards (`points.py`)
+
+Every citizen submission creates a `ReportModel` (one submission, even if AI perception splits it into several category events), and points are evaluated **per report**, not per resulting event. Four awards happen at submission time — report (+10), photo evidence (+5), meaningful text ≥15 chars (+5), and an accurate location that isn't just the untouched map-center default (+5) — plus three post-submission awards: another citizen verifying the report (+10, once, and not by the reporter themselves), an officer acknowledging/resolving its event for the first time (+25, hooked into the existing governance status-update endpoint), and a meaningful follow-up ≥7 days later (+10, once).
+
+**"Only once" is a data guarantee, not a promise**: every award writes one row to the append-only `points_ledger` keyed by `(user_id, report_id, action_type)`; the award function checks for an existing row with that exact key before writing, so re-triggering the same action is a no-op.
+
+**Anti-abuse**: a report is flagged as spam (no points, but still recorded) if its photo hash exactly matches one already on file, or if the same user has filed more than `SPAM_RATE_LIMIT_MAX_REPORTS` reports within `SPAM_RATE_LIMIT_WINDOW_MINUTES`.
+
+**Levels** (`CONTRIBUTION_LEVELS` in `config.py`) are based on *lifetime points earned*, never current balance — redeeming a reward can't demote you. Thresholds: 100 → Bronze Citizen, 200 → Silver Citizen, 300 → Gold Citizen, 400 → City Champion. The reward catalog and example community partners are also static config, ready to swap for a real onboarded-partner database.
 
 ---
 
